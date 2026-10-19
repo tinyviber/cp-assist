@@ -4,23 +4,134 @@ import { call } from "mygo-runtime";
 
 // ---- Types ----
 
-/** Info describes the app and the machine it runs on. */
-export interface Info {
-  os: string;
-  arch: string;
-  goVersion: string;
-  version: string;
+/** Filters lists the available filter values. */
+export interface Filters {
+  platforms: Option[];
+  tiers: Option[];
+  /** knowledge-point codes, minus tech.* */
+  kp: Option[];
+  /** tech.* codes */
+  tech: Option[];
+}
+
+/** Option is one filter choice with its row count. */
+export interface Option {
+  id: string;
+  count: number;
+}
+
+/** Page is one page of search results. */
+export interface Page {
+  total: number;
+  page: number;
+  pages: number;
+  items: Problem[];
+}
+
+/** Problem is one catalog row as the list shows it. */
+export interface Problem {
+  key: string;
+  platform: string;
+  pid: string;
+  title: string;
+  url: string;
+  contest: string;
+  year: number;
+  tier: string;
+  /** normalized ≈CF estimate; nil = unrated */
+  ratingEst: number | null;
+  /** the source's own difficulty label, never equated to CF */
+  native: string;
+  /** tags_main: the 1-3 most fitting knowledge points */
+  main: string[];
+  /** knowledge minus main: weaker-confidence mentions */
+  extra: string[];
+  /** annotation provenance */
+  annSource: string;
+  /** the platform's own tags, verbatim */
+  tags: string[];
+}
+
+/** Review is one saved retrospective note. */
+export interface Review {
+  id: number;
+  title: string;
+  causes: string[];
+  note: string;
+  created: number;
+}
+
+/** ReviewStats summarizes the saved reviews. */
+export interface ReviewStats {
+  total: number;
+  topCauses: Option[];
+}
+
+/** SearchQuery is one paged, filtered list request. */
+export interface SearchQuery {
+  search: string;
+  platform: string;
+  tier: string;
+  /** algorithm knowledge point (non-tech.* code) */
+  kp: string;
+  /** thinking technique (tech.* code) */
+  tech: string;
+  page: number;
+}
+
+/** Status is the import state the frontend polls on startup. */
+export interface Status {
+  ready: boolean;
+  importing: boolean;
+  total: number;
+  error?: string;
 }
 
 // ---- Services ----
 
 /**
- * App is callable from the frontend: `mygo generate` turns its methods
- * into typed TypeScript functions in src/mygo.ts.
+ * Catalog is the bound data service. It imports
+ * cptrain/research/hard-problems-catalog/catalog_annotated.jsonl into a
+ * SQLite database in the app's user-data directory on first run (and when
+ * the file changes), then answers the frontend's paged queries from it.
+ *
+ * Bound methods run on IPC goroutines; *sqlite.DB serializes them, and the
+ * import holds an extra mutex so a re-import never races a query.
  */
-export const App = {
-  /** Info returns information about the app and the system. */
-  info(): Promise<Info> {
-    return call("App.Info");
+export const Catalog = {
+  /** AddReview saves a retrospective note. Fields are capped on the server. */
+  addReview(r: Review): Promise<number> {
+    return call("Catalog.AddReview", r);
+  },
+  /** DeleteReview removes one saved note. */
+  deleteReview(id: number): Promise<void> {
+    return call("Catalog.DeleteReview", id);
+  },
+  /** Filters lists platforms, tiers and knowledge-point codes with counts. */
+  filters(): Promise<Filters> {
+    return call("Catalog.Filters");
+  },
+  /** ReviewStats counts reviews and how often each cause was chosen. */
+  reviewStats(): Promise<ReviewStats> {
+    return call("Catalog.ReviewStats");
+  },
+  /** Reviews lists saved notes, newest first. */
+  reviews(): Promise<Review[]> {
+    return call("Catalog.Reviews");
+  },
+  /** Search runs a filtered, paged query. All inputs are bound parameters. */
+  search(q: SearchQuery): Promise<Page> {
+    return call("Catalog.Search", q);
+  },
+  /** Status reports whether the catalog is imported and queryable. */
+  status(): Promise<Status> {
+    return call("Catalog.Status");
+  },
+  /**
+   * Today returns a small queue for the training page: a few problems around
+   * the 省选/NOI band, re-picked on each launch.
+   */
+  today(): Promise<Problem[]> {
+    return call("Catalog.Today");
   },
 } as const;

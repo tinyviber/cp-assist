@@ -2,37 +2,22 @@ package main
 
 import (
 	"log"
-	"runtime"
 
 	"github.com/egoist/mygo"
 )
 
-// App is callable from the frontend: `mygo generate` turns its methods
-// into typed TypeScript functions in src/mygo.ts.
-type App struct{}
-
-// Info describes the app and the machine it runs on.
-type Info struct {
-	OS        string `json:"os"`
-	Arch      string `json:"arch"`
-	GoVersion string `json:"goVersion"`
-	Version   string `json:"version"`
-}
-
-// Info returns information about the app and the system.
-func (App) Info() Info {
-	return Info{
-		OS:        runtime.GOOS,
-		Arch:      runtime.GOARCH,
-		GoVersion: runtime.Version(),
-		Version:   "0.1.0",
-	}
-}
-
 func main() {
-	mygo.Bind(App{})
+	catalog := &Catalog{}
+	mygo.Bind(catalog)
 
 	mygo.App.WhenReady(func() {
+		if err := catalog.open(); err != nil {
+			log.Printf("catalog: %v", err)
+			catalog.setErr(err)
+		} else {
+			catalog.importIfNeeded()
+		}
+
 		mygo.NewWindow(mygo.WindowOptions{
 			Title:         "CP Assist",
 			Width:         1160,
