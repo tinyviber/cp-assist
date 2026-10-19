@@ -1,0 +1,16 @@
+# dependencies & builds (mygo)
+node_modules/
+/dist/
+/build/
+/.mygo/
+mygo_windows_*.syso
+
+# macOS
+.DS_Store
+
+# local secrets / env
+.env
+*.local
+
+# stray go build output
+/cp-assist
